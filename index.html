@@ -81,7 +81,13 @@ function ScoreBar({ correct, total }) {
         <div style={{height:"100%",borderRadius:99,background:color,width:`${rate}%`,transition:"width 0.4s ease"}}/>
       </div>
       <div style={{marginTop:4,fontSize:11,color:C.textSub,textAlign:"right"}}>
-        {rate>=60?"✅ 合格圏":rate>=50?"🔶 あと一歩":rate>=40?"🔸 要強化":total>0?"❌ 要対策":""}
+        {
+  total===0
+    ? ""
+    : rate>=60
+      ? "🟢 合格圏"
+      : `🔴 合格まであと${Math.max(0, Math.ceil(total*0.6)-correct)}問`
+}
       </div>
     </div>
   );
@@ -221,6 +227,36 @@ const [years, setYears] = useState(() => {
   };
 
   useEffect(() => { if (tab==="summary") loadSummary(); }, [tab]);
+  const getRanking = () => {
+  const list = [];
+
+  for (const sub of subjects) {
+    for (const yr of years) {
+
+      const count = lsCountAttempts(sub.id, yr);
+
+      if (count === 0) continue;
+
+      const d = lsLoad(sub.id, yr, count);
+
+      if (!d) continue;
+
+      const correct = Object.values(d.answers).filter(v => v === "○").length;
+      const total = Object.values(d.answers).filter(v => v !== null).length;
+
+      if (total === 0) continue;
+
+      list.push({
+        subject: sub.name,
+        year: yr,
+        rate: Math.round(correct / total * 100)
+      });
+
+    }
+  }
+
+  return list.sort((a,b)=>b.rate-a.rate);
+};
 const addYear = () => {
   const y = prompt("追加する年度を入力してください（例：R6）");
 
@@ -277,6 +313,7 @@ const changeQuestionCount = () => {
   );
 
 };
+  const ranking = getRanking();
   const correct = Object.values(answers).filter(v=>v==="○").length;
   const answered = Object.values(answers).filter(v=>v!==null).length;
 
@@ -468,6 +505,76 @@ cursor:"pointer"
       ) : (
         <div style={{padding:16}}>
           <div style={{fontSize:15,fontWeight:800,color:C.textMain,marginBottom:14}}>全科目サマリー</div>
+          <div
+  style={{
+    background:C.surface,
+    borderRadius:12,
+    padding:"12px 14px",
+    marginBottom:16,
+    boxShadow:"0 1px 4px #0001"
+  }}
+>
+  <div
+    style={{
+      fontWeight:800,
+      fontSize:15,
+      color:C.navy,
+      marginBottom:10
+    }}
+  >
+    🏆 正答率ランキング TOP5
+  </div>
+
+  {ranking.length===0 ? (
+    <div
+      style={{
+        color:C.textSub,
+        fontSize:13
+      }}
+    >
+      まだデータがありません
+    </div>
+  ) : (
+    ranking.slice(0,5).map((r,i)=>(
+      <div
+        key={i}
+        style={{
+          display:"flex",
+          justifyContent:"space-between",
+          alignItems:"center",
+          padding:"8px 0",
+          borderBottom:i===ranking.slice(0,5).length-1 ? "none" : "1px solid #eee"
+        }}
+      >
+
+        <div>
+          <span style={{fontWeight:700}}>
+            {i+1}位
+          </span>
+
+          {"　"}
+
+          {r.subject}
+
+          {"　"}
+
+          {r.year}
+        </div>
+
+        <div
+          style={{
+            color:r.rate>=60?C.green:C.red,
+            fontWeight:800
+          }}
+        >
+          {r.rate}%
+        </div>
+
+      </div>
+    ))
+  )}
+
+</div>
           {summary && subjects.map(s=>{
             const subjData = summary[s.id]??{};
             return (
