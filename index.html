@@ -194,9 +194,9 @@ const [years, setYears] = useState(() => {
 
   const loadSummary = () => {
     const s = {};
-    for (const sub of SUBJECTS) {
+    for (const sub of subjects) {
       s[sub.id] = {};
-      for (const yr of YEARS) {
+      for (const yr of years) {
         const count = lsCountAttempts(sub.id, yr);
         const attempts = [];
         for (let i=1; i<=count; i++) {
@@ -214,7 +214,62 @@ const [years, setYears] = useState(() => {
   };
 
   useEffect(() => { if (tab==="summary") loadSummary(); }, [tab]);
+const addYear = () => {
+  const y = prompt("追加する年度を入力してください（例：R6）");
 
+  if (!y) return;
+
+  if (years.includes(y)) {
+    alert("その年度は既にあります");
+    return;
+  }
+
+  const newYears = [...years, y];
+
+  setYears(newYears);
+  localStorage.setItem("years", JSON.stringify(newYears));
+};
+
+const deleteYear = (y) => {
+  if (!confirm(`${y}を削除しますか？`)) return;
+
+  const newYears = years.filter(v => v !== y);
+
+  setYears(newYears);
+  localStorage.setItem("years", JSON.stringify(newYears));
+
+  if (year === y) {
+    setYear(newYears[newYears.length - 1]);
+  }
+};
+const changeQuestionCount = () => {
+
+  const value = prompt(
+    `${subj.full}の問題数`,
+    subj.questions
+  );
+
+  if (!value) return;
+
+  const n = parseInt(value);
+
+  if (isNaN(n) || n <= 0) return;
+
+  const newSubjects = [...subjects];
+
+  newSubjects[subjIdx] = {
+    ...newSubjects[subjIdx],
+    questions: n
+  };
+
+  setSubjects(newSubjects);
+
+  localStorage.setItem(
+    "subjects",
+    JSON.stringify(newSubjects)
+  );
+
+};
   const correct = Object.values(answers).filter(v=>v==="○").length;
   const answered = Object.values(answers).filter(v=>v!==null).length;
 
@@ -260,6 +315,50 @@ const [years, setYears] = useState(() => {
           <div style={{marginBottom:10}}>
             <div style={{fontSize:15,fontWeight:800,color:C.textMain}}>{subj.full}</div>
             <div style={{fontSize:12,color:C.textSub}}>{subj.questions}問</div>
+            <div
+  style={{
+    marginTop:10,
+    display:"flex",
+    gap:8,
+    flexWrap:"wrap"
+  }}
+>
+
+<button
+onClick={changeQuestionCount}
+style={{
+padding:"6px 12px",
+border:"none",
+borderRadius:8,
+background:"#1A56A0",
+color:"white",
+fontWeight:700,
+cursor:"pointer"
+}}
+>
+
+問題数変更
+
+</button>
+
+<button
+onClick={addYear}
+style={{
+padding:"6px 12px",
+border:"none",
+borderRadius:8,
+background:"#27AE60",
+color:"white",
+fontWeight:700,
+cursor:"pointer"
+}}
+>
+
+年度追加
+
+</button>
+
+</div>
           </div>
 
           {/* Year */}
