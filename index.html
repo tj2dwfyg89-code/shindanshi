@@ -22,7 +22,7 @@
 <script type="text/babel">
 const { useState, useEffect, useCallback } = React;
 
-const SUBJECTS = [
+const DEFAULT_SUBJECTS = [
   { id: "eco", name: "経済", full: "経済学・経済政策", questions: 25 },
   { id: "fin", name: "財会", full: "財務・会計", questions: 20 },
   { id: "mgmt", name: "企経", full: "企業経営理論", questions: 40 },
@@ -32,7 +32,14 @@ const SUBJECTS = [
   { id: "sme", name: "中小", full: "中小企業経営・政策", questions: 42 },
 ];
 
-const YEARS = ["H30","R1","R2","R3","R4","R5"];
+const DEFAULT_YEARS = [
+  "H30",
+  "R1",
+  "R2",
+  "R3",
+  "R4",
+  "R5"
+];
 const C = {
   navy:"#0F2044", blue:"#1A56A0", paleBlue:"#E8F0FB",
   green:"#2ECC71", greenDark:"#27AE60", red:"#E74C3C", redDark:"#C0392B",
@@ -109,6 +116,15 @@ function AttemptHistory({ history }) {
 
 function App() {
   const [tab, setTab] = useState("input");
+  const [subjects, setSubjects] = useState(() => {
+  const saved = localStorage.getItem("subjects");
+  return saved ? JSON.parse(saved) : DEFAULT_SUBJECTS;
+});
+
+const [years, setYears] = useState(() => {
+  const saved = localStorage.getItem("years");
+  return saved ? JSON.parse(saved) : DEFAULT_YEARS;
+});
   const [subjIdx, setSubjIdx] = useState(0);
   const [year, setYear] = useState("R5");
   const [attempt, setAttempt] = useState(1);
@@ -119,7 +135,7 @@ function App() {
   const [history, setHistory] = useState([]);
   const [summary, setSummary] = useState(null);
 
-  const subj = SUBJECTS[subjIdx];
+  const subj = subjects[subjIdx];
 
   const buildHistory = useCallback((sid, yr, maxAtt) => {
     const hist = [];
@@ -229,7 +245,7 @@ function App() {
         <div style={{padding:16}}>
           {/* Subject tabs */}
           <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4,marginBottom:14}}>
-            {SUBJECTS.map((s,i)=>(
+            {subjects.map((s,i)=>(
               <button key={s.id} onClick={()=>{setSubjIdx(i);}} style={{
                 flexShrink:0,padding:"6px 12px",borderRadius:20,border:"none",cursor:"pointer",
                 background:i===subjIdx?C.blue:C.surface,
@@ -248,7 +264,7 @@ function App() {
 
           {/* Year */}
           <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
-            {YEARS.map(yr=>(
+            {years.map(yr=>(
               <button key={yr} onClick={()=>setYear(yr)} style={{
                 padding:"5px 12px",borderRadius:16,
                 border:`2px solid ${year===yr?C.blue:C.border}`,
@@ -312,13 +328,13 @@ function App() {
       ) : (
         <div style={{padding:16}}>
           <div style={{fontSize:15,fontWeight:800,color:C.textMain,marginBottom:14}}>全科目サマリー</div>
-          {summary && SUBJECTS.map(s=>{
+          {summary && subjects.map(s=>{
             const subjData = summary[s.id]??{};
             return (
               <div key={s.id} style={{background:C.surface,borderRadius:12,padding:"12px 14px",marginBottom:10,boxShadow:"0 1px 4px #0001"}}>
                 <div style={{fontWeight:800,fontSize:14,color:C.navy,marginBottom:8}}>{s.full}</div>
                 <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                  {YEARS.map(yr=>{
+                  {years.map(yr=>{
                     const attempts = subjData[yr]??[];
                     const last = attempts[attempts.length-1];
                     const rate = last?.rate??null;
