@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="診断士トラッカー">
+<title>診断士トラッカー</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { background: #F7F9FC; font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif; }
+  ::-webkit-scrollbar { display: none; }
+  button { -webkit-appearance: none; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useCallback } = React;
+
+const SUBJECTS = [
+  { id: "eco", name: "経済", full: "経済学・経済政策", questions: 25 },
+  { id: "fin", name: "財会", full: "財務・会計", questions: 20 },
+  { id: "mgmt", name: "企経", full: "企業経営理論", questions: 40 },
+  { id: "ops", name: "運営", full: "運営管理", questions: 44 },
+  { id: "law", name: "法務", full: "経営法務", questions: 20 },
+  { id: "it", name: "情報", full: "経営情報システム", questions: 20 },
+  { id: "sme", name: "中小", full: "中小企業経営・政策", questions: 42 },
+];
+
+const YEARS = ["H30","R1","R2","R3","R4","R5"];
+const C = {
+  navy:"#0F2044", blue:"#1A56A0", paleBlue:"#E8F0FB",
+  green:"#2ECC71", greenDark:"#27AE60", red:"#E74C3C", redDark:"#C0392B",
+  bg:"#F7F9FC", surface:"#FFFFFF", border:"#D8E4F0",
+  textMain:"#1A2A3A", textSub:"#6B7E96",
+};
+
+// LocalStorage helpers
+function lsKey(subjectId, year, attempt) {
+  return `shindanshi:${subjectId}:${year}:att${attempt}`;
+}
+function lsLoad(subjectId, year, attempt) {
+  try { const v = localStorage.getItem(lsKey(subjectId,year,attempt)); return v ? JSON.parse(v) : null; }
+  catch { return null; }
+}
+function lsSave(subjectId, year, attempt, answers) {
+  try { localStorage.setItem(lsKey(subjectId,year,attempt), JSON.stringify({answers, savedAt: new Date().toISOString()})); }
+  catch(e) { console.error(e); }
+}
+function lsCountAttempts(subjectId, year) {
+  let count = 0;
+  for (let i = 1; i <= 20; i++) {
+    if (localStorage.getItem(lsKey(subjectId, year, i)) !== null) count = i;
+    else if (i > count + 1) break;
+  }
+  return count;
+}
+
+function ScoreBar({ correct, total }) {
+  const rate = total > 0 ? Math.round(correct / total * 100) : 0;
+  const color = rate >= 60 ? C.green : rate >= 40 ? "#F39C12" : C.red;
+  return (
+    <div style={{marginTop:12}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:4}}>
+        <span style={{fontSize:13,color:C.textSub}}>{correct}/{total}問正解</span>
+        <span style={{fontSize:22,fontWeight:800,color}}>{total>0?`${rate}%`:"—"}</span>
+      </div>
+      <div style={{height:8,background:C.border,borderRadius:99}}>
+        <div style={{height:"100%",borderRadius:99,background:color,width:`${rate}%`,transition:"width 0.4s ease"}}/>
+      </div>
+      <div style={{marginTop:4,fontSize:11,color:C.textSub,textAlign:"right"}}>
+        {rate>=60?"✅ 合格圏":rate>=50?"🔶 あと一歩":rate>=40?"🔸 要強化":total>0?"❌ 要対策":""}
+      </div>
+    </div>
+  );
+}
+
+function AttemptHistory({ history }) {
+  if (!history || history.length < 2) return null;
+  const H=40, w=Math.min(history.length*48,320);
+  return (
+    <div style={{marginTop:14,padding:"10px 14px",background:C.paleBlue,borderRadius:10}}>
+      <div style={{fontSize:11,color:C.textSub,marginBottom:6,fontWeight:600}}>正答率の推移</div>
+      <svg width={w} height={H+24} style={{display:"block"}}>
+        {history.map((a,i) => {
+          const x=i*48+24, y=H-(a.rate??0)/100*H;
+          const color=(a.rate??0)>=60?C.green:(a.rate??0)>=40?"#F39C12":C.red;
+          return (
+            <g key={i}>
+              {i>0&&history[i-1].rate!==null&&(
+                <line x1={(i-1)*48+24} y1={H-(history[i-1].rate??0)/100*H} x2={x} y2={y} stroke={C.border} strokeWidth={2}/>
+              )}
+              <circle cx={x} cy={y} r={8} fill={color}/>
+              <text x={x} y={y-12} textAnchor="middle" fontSize={11} fontWeight="700" fill={color}>{a.rate!==null?`${a.rate}%`:""}</text>
+              <text x={x} y={H+16} textAnchor="middle" fontSize={10} fill={C.textSub}>{a.attempt}回目</text>
+            </g>
+          );
+        })}
+        <line x1={0} y1={H-60/100*H} x2={w} y2={H-60/100*H} stroke={C.green} strokeWidth={1} strokeDasharray="4,3" opacity={0.4}/>
+      </svg>
+    </div>
+  );
+}
+
+function App() {
+  const [tab, setTab] = useState("input");
+  const [subjIdx, setSubjIdx] = useState(0);
+  const [year, setYear] = useState("R5");
+  const [attempt, setAttempt] = useState(1);
+  const [maxAttempt, setMaxAttempt] = useState(1);
+  const [answers, setAnswers] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [summary, setSummary] = useState(null);
+
+  const subj = SUBJECTS[subjIdx];
+
+  const buildHistory = useCallback((sid, yr, maxAtt) => {
+    const hist = [];
+    for (let i=1; i<=maxAtt; i++) {
+      const d = lsLoad(sid, yr, i);
+      if (d) {
+        const correct = Object.values(d.answers).filter(v=>v==="○").length;
+        const total = Object.values(d.answers).filter(v=>v!==null).length;
+        hist.push({attempt:i, correct, total, rate: total>0?Math.round(correct/total*100):null});
+      }
+    }
+    return hist;
+  }, []);
+
+  const loadData = useCallback((sid, yr, att) => {
+    const count = lsCountAttempts(sid, yr);
+    const max = Math.max(count, 1);
+    setMaxAttempt(max);
+    const finalAtt = att !== undefined ? att : Math.min(attempt, max);
+    setAttempt(finalAtt);
+    const data = lsLoad(sid, yr, finalAtt);
+    setAnswers(data?.answers ?? {});
+    setHistory(buildHistory(sid, yr, max));
+  }, [attempt, buildHistory]);
+
+  useEffect(() => { loadData(subj.id, year, 1); }, [subj.id, year]);
+
+  const switchAttempt = (att) => {
+    setAttempt(att);
+    const data = lsLoad(subj.id, year, att);
+    setAnswers(data?.answers ?? {});
+  };
+
+  const newAttempt = () => {
+    const next = maxAttempt + 1;
+    setMaxAttempt(next);
+    setAttempt(next);
+    setAnswers({});
+  };
+
+  const toggle = (qNum, val) => {
+    const newAnswers = {...answers, [qNum]: answers[qNum]===val ? null : val};
+    setAnswers(newAnswers);
+    lsSave(subj.id, year, attempt, newAnswers);
+    const correct = Object.values(newAnswers).filter(v=>v==="○").length;
+    const total = Object.values(newAnswers).filter(v=>v!==null).length;
+    const rate = total>0?Math.round(correct/total*100):null;
+    setHistory(prev => {
+      const updated = [...prev];
+      const idx = updated.findIndex(h=>h.attempt===attempt);
+      if (idx>=0) updated[idx] = {attempt,correct,total,rate};
+      else updated.push({attempt,correct,total,rate});
+      return updated;
+    });
+  };
+
+  const loadSummary = () => {
+    const s = {};
+    for (const sub of SUBJECTS) {
+      s[sub.id] = {};
+      for (const yr of YEARS) {
+        const count = lsCountAttempts(sub.id, yr);
+        const attempts = [];
+        for (let i=1; i<=count; i++) {
+          const d = lsLoad(sub.id, yr, i);
+          if (d) {
+            const correct = Object.values(d.answers).filter(v=>v==="○").length;
+            const total = Object.values(d.answers).filter(v=>v!==null).length;
+            attempts.push({attempt:i,correct,total,rate:total>0?Math.round(correct/total*100):null});
+          }
+        }
+        s[sub.id][yr] = attempts;
+      }
+    }
+    setSummary(s);
+  };
+
+  useEffect(() => { if (tab==="summary") loadSummary(); }, [tab]);
+
+  const correct = Object.values(answers).filter(v=>v==="○").length;
+  const answered = Object.values(answers).filter(v=>v!==null).length;
+
+  return (
+    <div style={{fontFamily:"'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif",background:C.bg,minHeight:"100vh",maxWidth:480,margin:"0 auto"}}>
+      {/* Header */}
+      <div style={{background:C.navy,padding:"14px 16px 0",position:"sticky",top:0,zIndex:100}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <div>
+            <div style={{fontSize:10,color:"#7A9CC0",letterSpacing:"0.08em",fontWeight:600}}>中小企業診断士 1次試験</div>
+            <div style={{fontSize:16,fontWeight:800,color:"#FFFFFF"}}>過去問トラッカー</div>
+          </div>
+          {saving&&<div style={{fontSize:11,color:"#7A9CC0"}}>保存中…</div>}
+        </div>
+        <div style={{display:"flex",gap:4}}>
+          {[["input","✏️ 入力"],["summary","📊 集計"]].map(([t,label])=>(
+            <button key={t} onClick={()=>setTab(t)} style={{
+              flex:1,padding:"8px 0",border:"none",cursor:"pointer",
+              borderRadius:"8px 8px 0 0",fontSize:13,fontWeight:700,
+              background:tab===t?C.bg:"transparent",
+              color:tab===t?C.navy:"#7A9CC0",transition:"all 0.2s"
+            }}>{label}</button>
+          ))}
+        </div>
+      </div>
+
+      {tab==="input" ? (
+        <div style={{padding:16}}>
+          {/* Subject tabs */}
+          <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4,marginBottom:14}}>
+            {SUBJECTS.map((s,i)=>(
+              <button key={s.id} onClick={()=>{setSubjIdx(i);}} style={{
+                flexShrink:0,padding:"6px 12px",borderRadius:20,border:"none",cursor:"pointer",
+                background:i===subjIdx?C.blue:C.surface,
+                color:i===subjIdx?"#fff":C.textMain,
+                fontSize:13,fontWeight:700,
+                boxShadow:i===subjIdx?`0 2px 8px ${C.blue}44`:"0 1px 3px #0001",
+                transition:"all 0.2s"
+              }}>{s.name}</button>
+            ))}
+          </div>
+
+          <div style={{marginBottom:10}}>
+            <div style={{fontSize:15,fontWeight:800,color:C.textMain}}>{subj.full}</div>
+            <div style={{fontSize:12,color:C.textSub}}>{subj.questions}問</div>
+          </div>
+
+          {/* Year */}
+          <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
+            {YEARS.map(yr=>(
+              <button key={yr} onClick={()=>setYear(yr)} style={{
+                padding:"5px 12px",borderRadius:16,
+                border:`2px solid ${year===yr?C.blue:C.border}`,
+                background:year===yr?C.blue:C.surface,
+                color:year===yr?"#fff":C.textMain,
+                fontSize:13,fontWeight:700,cursor:"pointer",transition:"all 0.15s"
+              }}>{yr}</button>
+            ))}
+          </div>
+
+          {/* Attempt */}
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:14}}>
+            <span style={{fontSize:12,color:C.textSub,fontWeight:600}}>回数：</span>
+            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+              {Array.from({length:maxAttempt},(_,i)=>i+1).map(att=>(
+                <button key={att} onClick={()=>switchAttempt(att)} style={{
+                  width:34,height:34,borderRadius:8,border:"none",cursor:"pointer",
+                  background:att===attempt?C.navy:C.paleBlue,
+                  color:att===attempt?"#fff":C.blue,
+                  fontSize:13,fontWeight:800,transition:"all 0.15s"
+                }}>{att}</button>
+              ))}
+              <button onClick={newAttempt} style={{
+                width:34,height:34,borderRadius:8,border:`2px dashed ${C.border}`,
+                background:"transparent",color:C.textSub,fontSize:20,cursor:"pointer",
+                display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700
+              }}>+</button>
+            </div>
+          </div>
+
+          {/* Question grid */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8,marginBottom:16}}>
+            {Array.from({length:subj.questions},(_,i)=>i+1).map(qNum=>{
+              const ans = answers[qNum]??null;
+              return (
+                <div key={qNum} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                  <div style={{fontSize:10,color:C.textSub,fontWeight:600}}>問{qNum}</div>
+                  <div style={{display:"flex",gap:3}}>
+                    {["○","✕"].map(val=>(
+                      <button key={val} onClick={()=>toggle(qNum,val)} style={{
+                        width:28,height:28,borderRadius:6,border:"none",cursor:"pointer",
+                        fontSize:13,fontWeight:800,
+                        background:ans===val?(val==="○"?C.green:C.red):C.paleBlue,
+                        color:ans===val?"#fff":(val==="○"?C.greenDark:C.redDark),
+                        transition:"all 0.12s",
+                        transform:ans===val?"scale(1.1)":"scale(1)",
+                        boxShadow:ans===val?`0 2px 6px ${val==="○"?C.green:C.red}66`:"none"
+                      }}>{val}</button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{background:C.surface,borderRadius:12,padding:"14px 16px",boxShadow:"0 1px 4px #0001"}}>
+            <ScoreBar correct={correct} total={answered}/>
+          </div>
+          <AttemptHistory history={history}/>
+        </div>
+      ) : (
+        <div style={{padding:16}}>
+          <div style={{fontSize:15,fontWeight:800,color:C.textMain,marginBottom:14}}>全科目サマリー</div>
+          {summary && SUBJECTS.map(s=>{
+            const subjData = summary[s.id]??{};
+            return (
+              <div key={s.id} style={{background:C.surface,borderRadius:12,padding:"12px 14px",marginBottom:10,boxShadow:"0 1px 4px #0001"}}>
+                <div style={{fontWeight:800,fontSize:14,color:C.navy,marginBottom:8}}>{s.full}</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                  {YEARS.map(yr=>{
+                    const attempts = subjData[yr]??[];
+                    const last = attempts[attempts.length-1];
+                    const rate = last?.rate??null;
+                    const color = rate===null?C.textSub:rate>=60?C.green:rate>=40?"#F39C12":C.red;
+                    return (
+                      <div key={yr} style={{background:C.paleBlue,borderRadius:8,padding:"6px 10px",minWidth:52,textAlign:"center"}}>
+                        <div style={{fontSize:10,color:C.textSub,fontWeight:600}}>{yr}</div>
+                        <div style={{fontSize:15,fontWeight:800,color}}>{rate!==null?`${rate}%`:"—"}</div>
+                        {attempts.length>0&&<div style={{fontSize:9,color:C.textSub}}>{attempts.length}回</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+          <button onClick={loadSummary} style={{
+            width:"100%",marginTop:8,padding:"12px 0",borderRadius:10,border:"none",
+            background:C.blue,color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"
+          }}>🔄 最新に更新</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.render(<App/>, document.getElementById("root"));
+</script>
+</body>
+</html>
