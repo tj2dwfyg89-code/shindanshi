@@ -364,14 +364,48 @@ cursor:"pointer"
           {/* Year */}
           <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
             {years.map(yr=>(
-              <button key={yr} onClick={()=>setYear(yr)} style={{
-                padding:"5px 12px",borderRadius:16,
-                border:`2px solid ${year===yr?C.blue:C.border}`,
-                background:year===yr?C.blue:C.surface,
-                color:year===yr?"#fff":C.textMain,
-                fontSize:13,fontWeight:700,cursor:"pointer",transition:"all 0.15s"
-              }}>{yr}</button>
-            ))}
+  <div
+    key={yr}
+    style={{
+      display:"flex",
+      alignItems:"center",
+      gap:2
+    }}
+  >
+
+    <button
+      onClick={()=>setYear(yr)}
+      style={{
+        padding:"5px 12px",
+        borderRadius:16,
+        border:`2px solid ${year===yr?C.blue:C.border}`,
+        background:year===yr?C.blue:C.surface,
+        color:year===yr?"#fff":C.textMain,
+        fontSize:13,
+        fontWeight:700,
+        cursor:"pointer",
+        transition:"all 0.15s"
+      }}
+    >
+      {yr}
+    </button>
+
+    <button
+      onClick={()=>deleteYear(yr)}
+      style={{
+        border:"none",
+        background:"transparent",
+        color:C.red,
+        cursor:"pointer",
+        fontWeight:700,
+        fontSize:14
+      }}
+    >
+      ✕
+    </button>
+
+  </div>
+))}
           </div>
 
           {/* Attempt */}
