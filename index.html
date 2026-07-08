@@ -126,7 +126,14 @@ const [years, setYears] = useState(() => {
   return saved ? JSON.parse(saved) : DEFAULT_YEARS;
 });
   const [subjIdx, setSubjIdx] = useState(0);
-  const [year, setYear] = useState("R5");
+  const [year, setYear] = useState(() => {
+  const saved = localStorage.getItem("years");
+  if (saved) {
+    const ys = JSON.parse(saved);
+    return ys[ys.length - 1];
+  }
+  return "R5";
+});
   const [attempt, setAttempt] = useState(1);
   const [maxAttempt, setMaxAttempt] = useState(1);
   const [answers, setAnswers] = useState({});
